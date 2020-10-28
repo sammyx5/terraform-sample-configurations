@@ -1,21 +1,21 @@
 # Create a resource group
 resource "azurerm_resource_group" "main" {
   name     = "${var.prefix}-resources"
-  location = "North Europe"
+  location = var.location
 }
 
 resource "azurerm_virtual_network" "main" {
   name                = "${var.prefix}-network"
-  address_space       = ["10.0.0.0/16"]
+  address_space       = var.vnet_address_space
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
 }
 
-resource "azurerm_subnet" "internal" {
-  name                 = "internal"
+resource "azurerm_subnet" "main" {
+  name                 = "${var.prefix}-subnet"
   resource_group_name  = azurerm_resource_group.main.name
   virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = ["10.0.2.0/24"]
+  address_prefixes     = var.subnet_address_space
 }
 
 resource "azurerm_public_ip" "pip" {
@@ -58,8 +58,8 @@ resource "azurerm_network_interface" "main" {
   resource_group_name = azurerm_resource_group.main.name
 
   ip_configuration {
-    name                          = "testconfiguration1"
-    subnet_id                     = azurerm_subnet.internal.id
+    name                          = "${var.prefix}-ipconfig"
+    subnet_id                     = azurerm_subnet.main.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.pip.id 
   }
@@ -77,12 +77,9 @@ resource "azurerm_virtual_machine" "main" {
   location              = azurerm_resource_group.main.location
   resource_group_name   = azurerm_resource_group.main.name
   network_interface_ids = [azurerm_network_interface.main.id]
-  vm_size               = "Standard_D12_v2"
+  vm_size               = var.db_vm_size
 
-  # Uncomment this line to delete the OS disk automatically when deleting the VM
   delete_os_disk_on_termination = true
-
-  # Uncomment this line to delete the data disks automatically when deleting the VM
   delete_data_disks_on_termination = true
   
   storage_os_disk {
@@ -94,8 +91,6 @@ resource "azurerm_virtual_machine" "main" {
 
   storage_image_reference {
       id = var.custom_windows_img_ref_id
-      # id = "/subscriptions/9f36d64e-2618-41e2-9691-9006a8ec91c5/resourceGroups/ale-images/providers/Microsoft.Compute/images/ale-plt-image-v110-20200305151816"
-      # id = "/subscriptions/9f36d64e-2618-41e2-9691-9006a8ec91c5/resourceGroups/ale-image-gallery-rg/providers/Microsoft.Compute/galleries/aleimagegallery/images/platform-image-win2016/versions/1.0.0"
   }
 
   os_profile_windows_config {
@@ -105,12 +100,12 @@ resource "azurerm_virtual_machine" "main" {
 
   os_profile {
     computer_name  = "${var.prefix}-vm"
-    admin_username = "ifsadmin"
-    admin_password = "Password!1234"
+    admin_username = var.admin_username
+    admin_password = var.admin_password
   }
 
   tags = {
-    environment = "disks form disk image"
+    environment = "vm from module"
   }
 }
 
